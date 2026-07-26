@@ -1,0 +1,50 @@
+<%= form_with(model: project) do |form| %>
+  <% if project.errors.any? %>
+    <div style="color: red">
+      <h2><%= pluralize(project.errors.count, "error") %> prohibited this project from being saved:</h2>
+
+      <ul>
+        <% project.errors.each do |error| %>
+          <li><%= error.full_message %></li>
+        <% end %>
+      </ul>
+    </div>
+  <% end %>
+
+  <div>
+    <%= form.label :title, style: "display: block" %>
+    <%= form.text_field :title %>
+  </div>
+
+  <div>
+    <%= form.label :description, style: "display: block" %>
+    <%= form.textarea :description %>
+  </div>
+
+  <%# ===========================================================================
+      RAILS 8.1 — MARKDOWN RENDERING
+      The notes field stores Markdown content authored by the user.
+      It is exposed via GET /projects/:id.md using the new format.md format.
+      Project#to_markdown composes a full document from title + description + notes.
+      =========================================================================== %>
+  <div style="margin-top:14px;">
+    <%= form.label :notes, style: "display: block; font-weight: 600; margin-bottom: 4px;" do %>
+      📝 Notes
+      <span style="font-size:0.75em; font-weight:400; color:#64748b; margin-left:6px;">
+        Supports Markdown — view rendered at <code>/projects/:id.md</code>
+      </span>
+    <% end %>
+    <%= form.textarea :notes,
+          rows: 8,
+          placeholder: "# My Notes\n\nWrite your notes in **Markdown** format.\n\n- Item one\n- Item two\n\n## Status\n\nIn progress.",
+          style: "width:100%; font-family:monospace; font-size:0.9em; padding:8px; border:1px solid #cbd5e1; border-radius:6px;" %>
+    <p style="font-size:0.75em; color:#64748b; margin:4px 0 0 0;">
+      Rails 8.1 feature: <code>render markdown: @project</code> calls <code>project.to_markdown</code>
+      and renders it as HTML. Access via <code>.md</code> extension.
+    </p>
+  </div>
+
+  <div>
+    <%= form.submit %>
+  </div>
+<% end %>

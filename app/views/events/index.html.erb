@@ -1,0 +1,129 @@
+<%# ===========================================================================
+    RAILS 8.1 — STRUCTURED EVENT REPORTING: Events Log
+    Displays the last 50 structured events stored in Solid Cache by
+    LogEventSubscriber. Events are emitted via Rails.event.notify().
+    =========================================================================== %>
+
+<% content_for :title, "Structured Events" %>
+
+<style>
+  .event-row { background:white; border:1px solid #e2e8f0; border-radius:8px; padding:12px 16px; margin-bottom:10px; font-size:0.85em; }
+  .event-name { font-weight:700; color:#1e293b; font-size:0.95em; }
+  .event-time { color:#94a3b8; font-size:0.78em; }
+  .event-payload { background:#f8fafc; border-radius:4px; padding:6px 10px; margin-top:8px; font-family:monospace; font-size:0.8em; color:#475569; word-break:break-all; }
+  .event-source { color:#94a3b8; font-size:0.75em; margin-top:4px; }
+  .badge-event { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75em; font-weight:600; margin-right:6px; }
+  .ev-project  { background:#dbeafe; color:#1e40af; }
+  .ev-import   { background:#d1fae5; color:#065f46; }
+  .ev-stats    { background:#fef3c7; color:#92400e; }
+  .ev-events   { background:#f3e8ff; color:#6b21a8; }
+  .ev-deprecated { background:#fee2e2; color:#991b1b; }
+  .ev-other    { background:#f1f5f9; color:#475569; }
+</style>
+
+<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+  <div>
+    <h1 style="margin:0;">📡 Structured Events</h1>
+    <p style="color:#64748b; margin:4px 0 0 0; font-size:0.9em;">
+      Rails 8.1 <strong>Event Reporter</strong> — last <%= @events.size %> events captured via <code>Rails.event.notify()</code>
+    </p>
+  </div>
+  <div style="display:flex; gap:8px; align-items:center;">
+    <%= button_to "Clear Log", clear_events_path, method: :delete,
+          style: "background:#dc2626; color:white; border:none; padding:6px 14px; border-radius:6px; cursor:pointer; font-size:0.85em;" %>
+    <%= link_to "↻ Refresh", events_path,
+          style: "background:#f1f5f9; color:#475569; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+  </div>
+</div>
+
+<%# How it works card %>
+<div style="background:#dbeafe; border:1px solid #93c5fd; border-radius:8px; padding:14px; margin-bottom:20px; font-size:0.82em;">
+  <strong>💡 How Rails 8.1 Structured Events work:</strong>
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:8px;">
+    <div>
+      <strong>Emit an event anywhere:</strong>
+      <pre style="background:#1e293b; color:#e2e8f0; padding:8px; border-radius:4px; margin:4px 0 0 0; font-size:0.9em; line-height:1.5;">Rails.event.notify(
+  "project.created",
+  project_id: 42,
+  title: "My Project"
+)</pre>
+    </div>
+    <div>
+      <strong>Subscriber receives it:</strong>
+      <pre style="background:#1e293b; color:#e2e8f0; padding:8px; border-radius:4px; margin:4px 0 0 0; font-size:0.9em; line-height:1.5;">class LogEventSubscriber
+  def emit(event)
+    # event[:name], event[:payload]
+    # event[:source_location]
+    # event[:occurred_at]
+  end
+end</pre>
+    </div>
+  </div>
+</div>
+
+<% if @events.empty? %>
+  <div style="background:#f8fafc; border:2px dashed #e2e8f0; border-radius:10px; padding:40px; text-align:center; color:#64748b;">
+    <p style="font-size:1.1em; margin:0 0 10px 0;">No events yet.</p>
+    <p style="font-size:0.85em; margin:0 0 16px 0;">
+      Events will appear here when you create/update projects, start imports, or view this page.
+    </p>
+    <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+      <%= link_to "Create a Project →", new_project_path,
+            style: "background:#1e40af; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+      <%= link_to "Start an Import →", new_import_path,
+            style: "background:#065f46; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+    </div>
+  </div>
+<% else %>
+  <% @events.each_with_index do |event, i| %>
+    <%
+      name = event[:name].to_s
+      badge_class = case name
+        when /^project/ then "ev-project"
+        when /^import/  then "ev-import"
+        when /^stats/   then "ev-stats"
+        when /^events/  then "ev-events"
+        when /deprecated/ then "ev-deprecated"
+        else "ev-other"
+        end
+    %>
+    <div class="event-row">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+        <div>
+          <span class="badge-event <%= badge_class %>"><%= name.split(".").first.upcase %></span>
+          <span class="event-name"><%= name %></span>
+        </div>
+        <span class="event-time">
+          <%= Time.zone.parse(event[:occurred_at].to_s).strftime("%H:%M:%S") rescue event[:occurred_at] %>
+        </span>
+      </div>
+
+      <% if event[:payload].present? %>
+        <div class="event-payload">
+          <% event[:payload].each do |k, v| %>
+            <span style="color:#6366f1;"><%= k %></span>=<span style="color:#059669;"><%= v.inspect %></span>&nbsp;
+          <% end %>
+        </div>
+      <% end %>
+
+      <% if event[:source_location].present? %>
+        <div class="event-source">
+          📍 <%= event[:source_location][:filepath]&.sub(Rails.root.to_s + "/", "") %>:<%= event[:source_location][:lineno] %>
+        </div>
+      <% end %>
+
+      <% if event[:tags].present? %>
+        <div style="margin-top:4px;">
+          <% event[:tags].each do |tag| %>
+            <span style="background:#f3e8ff; color:#6b21a8; padding:1px 6px; border-radius:3px; font-size:0.75em; margin-right:4px;"><%= tag %></span>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+  <% end %>
+
+  <p style="color:#64748b; font-size:0.8em; margin-top:12px;">
+    Showing last <%= @events.size %> events. Events stored in Solid Cache (expires in 24h).
+    <%= link_to "View in Mission Control →", "/jobs", style: "color:#1e40af;" %>
+  </p>
+<% end %>

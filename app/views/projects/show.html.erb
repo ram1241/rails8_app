@@ -1,0 +1,28 @@
+<p style="color: green"><%= notice %></p>
+
+<%= render @project %>
+
+<%# ===========================================================================
+    RAILS 8.1 — MARKDOWN RENDERING
+    The `.md` extension triggers format.md in ProjectsController#show.
+    Rails calls @project.to_markdown and renders the result as HTML.
+    This is the new built-in Markdown format support added in Rails 8.1.
+    =========================================================================== %>
+<% if @project.notes.present? %>
+  <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:12px 16px; margin:12px 0; font-size:0.85em;">
+    <strong>📝 Notes preview:</strong>
+    <p style="margin:6px 0 0 0; color:#475569; font-style:italic; white-space:pre-wrap;"><%= @project.notes.truncate(200) %></p>
+  </div>
+<% end %>
+
+<div style="margin-top:12px;">
+  <%= link_to "Edit this project", edit_project_path(@project) %> |
+  <%= link_to "Back to projects", projects_path %>
+  &nbsp;|&nbsp;
+  <%# Rails 8.1: GET /projects/:id.md → triggers format.md block in controller %>
+  <%= link_to "📄 View as Markdown", project_path(@project, format: :md),
+        style: "background:#7c3aed; color:white; padding:4px 12px; border-radius:4px; text-decoration:none; font-size:0.85em;",
+        title: "Rails 8.1: render markdown: @project" %>
+
+  <%= button_to "Destroy this project", @project, method: :delete %>
+</div>

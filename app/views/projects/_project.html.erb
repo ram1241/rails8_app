@@ -1,0 +1,66 @@
+<%# ===========================================================================
+    HOTWIRE TURBO STREAMS — Project card partial
+    ===========================================================================
+    This partial is:
+    1. Rendered on first page load (server-side)
+    2. Appended LIVE via broadcast_append_to "projects_list" when a new
+       project is created (no page reload needed — Solid Cable delivers it)
+    3. Removed LIVE via broadcast_remove_to "projects_list" when a project
+       is archived by ArchiveProjectJob (10 seconds after creation)
+
+    dom_id(project) → "project_1", "project_2" etc.
+    Turbo uses this ID to know which element to append/replace/remove.
+    =========================================================================== %>
+<div id="<%= dom_id project %>"
+     style="border:1px solid #ddd; border-radius:8px; padding:16px; margin-bottom:12px; background:white; box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+    <div>
+      <h3 style="margin:0 0 6px 0; font-size:1.1em;">
+        <%= link_to project.title, project, style: "color:#1a1a2e; text-decoration:none;" %>
+      </h3>
+      <p style="margin:0 0 8px 0; color:#555; font-size:0.9em;">
+        <%= project.description %>
+      </p>
+    </div>
+
+    <div style="text-align:right; font-size:0.8em; color:#888; white-space:nowrap; margin-left:12px;">
+      <div>ID: #<%= project.id %></div>
+      <div>Created: <%= project.created_at.strftime("%H:%M:%S") %></div>
+    </div>
+  </div>
+
+  <%# Status badge — shows live archiving state %>
+  <div style="display:flex; gap:8px; align-items:center; margin-top:8px; flex-wrap:wrap;">
+    <% if project.archived? %>
+      <span style="background:#fee2e2; color:#991b1b; padding:2px 10px; border-radius:12px; font-size:0.8em; font-weight:600;">
+        📦 Archived
+      </span>
+      <span style="font-size:0.75em; color:#999;">
+        (archived by Solid Queue job)
+      </span>
+    <% else %>
+      <span style="background:#dcfce7; color:#166534; padding:2px 10px; border-radius:12px; font-size:0.8em; font-weight:600;">
+        ✅ Active
+      </span>
+      <span style="font-size:0.75em; color:#f59e0b;">
+        ⏳ Auto-archives in ~10s via Solid Queue
+      </span>
+    <% end %>
+
+    <%# Turbo Stream label — explains how this card arrived on the page %>
+    <span style="background:#eff6ff; color:#1d4ed8; padding:2px 10px; border-radius:12px; font-size:0.75em;">
+      ⚡ Turbo Stream
+    </span>
+  </div>
+
+  <div style="margin-top:10px; font-size:0.85em;">
+    <%= link_to "Show", project, style: "color:#2563eb;" %>
+    &nbsp;·&nbsp;
+    <%= link_to "Edit", edit_project_path(project), style: "color:#059669;" %>
+    &nbsp;·&nbsp;
+    <%= button_to "Delete", project, method: :delete,
+          style: "background:none; border:none; color:#dc2626; cursor:pointer; font-size:0.85em; padding:0;",
+          data: { turbo_confirm: "Delete this project?" } %>
+  </div>
+</div>

@@ -1,0 +1,163 @@
+<%# ===========================================================================
+    RAILS 8.1 — ACTIVE JOB CONTINUATIONS: Import Progress Page
+    =========================================================================== %>
+
+<% content_for :title, "Import: #{@import.name}" %>
+
+<%# Polling: inject a meta refresh into <head> ONLY when the import is running.
+    Turbo Drive intercepts this as a soft navigation (no full page flash),
+    re-fetching the same URL every 3 seconds. Once the import finishes,
+    the meta tag is no longer rendered → polling stops automatically. %>
+<% unless @import.finished? %>
+  <% content_for :head do %>
+    <meta http-equiv="refresh" content="3">
+  <% end %>
+<% end %>
+
+<style>
+  .progress-bar-outer {
+    background: #e2e8f0;
+    border-radius: 999px;
+    height: 20px;
+    width: 100%;
+    overflow: hidden;
+    margin: 10px 0;
+  }
+  .progress-bar-inner {
+    height: 100%;
+    border-radius: 999px;
+    transition: width 0.5s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.78em;
+    font-weight: 700;
+  }
+  .status-pending    { background: #94a3b8; }
+  .status-processing { background: #3b82f6; }
+  .status-completed  { background: #22c55e; }
+  .status-failed     { background: #ef4444; }
+</style>
+
+<div style="max-width:700px;">
+  <h1>📥 Import: <%= @import.name %></h1>
+  <p style="color:#64748b;">
+    Demonstrates <strong>Rails 8.1 ActiveJob::Continuable</strong> —
+    a multi-step, resumable background job with cursor-based progress tracking.
+  </p>
+
+  <%# Status badge %>
+  <div style="margin:16px 0; display:flex; align-items:center; gap:12px;">
+    <span style="font-size:1.1em; font-weight:700; color:#1e293b;">Status:</span>
+    <span style="
+      padding:4px 14px;
+      border-radius:999px;
+      font-weight:700;
+      font-size:0.9em;
+      <%= case @import.status
+          when 'pending'    then 'background:#f1f5f9; color:#475569;'
+          when 'processing' then 'background:#dbeafe; color:#1e40af;'
+          when 'completed'  then 'background:#dcfce7; color:#166534;'
+          when 'failed'     then 'background:#fee2e2; color:#dc2626;'
+          end %>
+    ">
+      <%= { 'pending' => '⏳ Pending', 'processing' => '⚙️ Processing',
+            'completed' => '✅ Completed', 'failed' => '❌ Failed' }[@import.status] %>
+    </span>
+
+    <% unless @import.finished? %>
+      <span style="font-size:0.8em; color:#64748b;">
+        ⟳ Auto-refreshing every 3s…
+      </span>
+    <% end %>
+  </div>
+
+  <%# Progress bar %>
+  <div class="progress-bar-outer">
+    <div class="progress-bar-inner status-<%= @import.status %>"
+         style="width:<%= [@import.progress_percentage, 100].min %>%;">
+      <% if @import.progress_percentage > 5 %>
+        <%= @import.progress_percentage %>%
+      <% end %>
+    </div>
+  </div>
+
+  <%# Stats row %>
+  <div style="display:flex; gap:24px; margin:16px 0; font-size:0.9em;">
+    <div>
+      <div style="color:#64748b;">Processed</div>
+      <div style="font-size:1.4em; font-weight:700; color:#1e293b;">
+        <%= @import.processed_count %>
+      </div>
+    </div>
+    <div>
+      <div style="color:#64748b;">Total</div>
+      <div style="font-size:1.4em; font-weight:700; color:#1e293b;">
+        <%= @import.total_count %>
+      </div>
+    </div>
+    <div>
+      <div style="color:#64748b;">Remaining</div>
+      <div style="font-size:1.4em; font-weight:700; color:#1e293b;">
+        <%= @import.total_count - @import.processed_count %>
+      </div>
+    </div>
+    <div>
+      <div style="color:#64748b;">Progress</div>
+      <div style="font-size:1.4em; font-weight:700; color:#1e293b;">
+        <%= @import.progress_percentage %>%
+      </div>
+    </div>
+  </div>
+
+  <% if @import.completed? %>
+    <div style="background:#dcfce7; border:1px solid #86efac; border-radius:8px; padding:14px; margin:16px 0;">
+      <strong>✅ Import completed successfully!</strong>
+      All <%= @import.total_count %> records were processed.
+      <% if @import.error_message.present? %>
+        <p style="color:#dc2626; margin-top:6px;"><%= @import.error_message %></p>
+      <% end %>
+    </div>
+  <% elsif @import.failed? %>
+    <div style="background:#fee2e2; border:1px solid #fca5a5; border-radius:8px; padding:14px; margin:16px 0;">
+      <strong>❌ Import failed.</strong>
+      <% if @import.error_message.present? %>
+        <p style="margin-top:6px;"><%= @import.error_message %></p>
+      <% end %>
+    </div>
+  <% end %>
+
+  <%# Job details card %>
+  <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:16px; margin-top:20px;">
+    <h3 style="margin:0 0 10px 0; font-size:0.95em; color:#475569;">📋 Import Details</h3>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.85em;">
+      <div><span style="color:#64748b;">ID:</span> <strong>#<%= @import.id %></strong></div>
+      <div><span style="color:#64748b;">Name:</span> <strong><%= @import.name %></strong></div>
+      <div><span style="color:#64748b;">Created:</span> <strong><%= @import.created_at.strftime("%d %b %Y %H:%M:%S") %></strong></div>
+      <div><span style="color:#64748b;">Updated:</span> <strong><%= @import.updated_at.strftime("%d %b %Y %H:%M:%S") %></strong></div>
+    </div>
+  </div>
+
+  <%# Continuable explanation card %>
+  <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:16px; margin-top:16px; font-size:0.82em;">
+    <strong>🔑 How ActiveJob::Continuable works here:</strong>
+    <ul style="margin:8px 0 0 16px; line-height:1.7;">
+      <li><strong>Step 1 — validate:</strong> marks import as "processing", validates total_count</li>
+      <li><strong>Step 2 — process_records:</strong> iterates records 1..N with a cursor; if interrupted mid-way, resumes from last cursor position</li>
+      <li><strong>Step 3 — finalize:</strong> marks import "completed", emits structured event via Rails.event</li>
+    </ul>
+    <p style="margin:10px 0 0 0;">
+      The job survives deploys and restarts — progress is never lost!
+    </p>
+  </div>
+
+  <div style="margin-top:20px; display:flex; gap:12px;">
+    <%= link_to "← All Imports", imports_path,
+          style: "color:#1e40af; text-decoration:none; font-size:0.9em;" %>
+    <%= link_to "View Events Log →", events_path,
+          style: "color:#7c3aed; text-decoration:none; font-size:0.9em;" %>
+    <%= link_to "Start Another Import", new_import_path,
+          style: "background:#1e40af; color:white; padding:8px 16px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+  </div>
+</div>

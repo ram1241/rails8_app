@@ -1,0 +1,60 @@
+# ===========================================================================
+# SOLID QUEUE CONFIGURATION
+# ===========================================================================
+# This file configures the Solid Queue supervisor, which manages:
+#   - Dispatchers: schedule delayed/recurring jobs into worker queues
+#   - Workers: pick up jobs from queues and execute them
+#
+# Multiple workers can target different queues with different thread counts.
+# This enables queue prioritization — urgent jobs are processed faster.
+#
+# Loaded by: config/environments/production.rb (config.solid_queue.connects_to)
+# Schema at: db/queue_schema.rb (queue.sqlite3 in production)
+#
+# To run in development:
+#   bin/jobs start    OR    set SOLID_QUEUE_IN_PUMA=true (runs inside Puma)
+# ===========================================================================
+
+default: &default
+  dispatchers:
+    - polling_interval: 1   # check for scheduled/delayed jobs every 1 second
+      batch_size: 500        # enqueue up to 500 jobs per dispatch cycle
+
+  workers:
+    # -------------------------------------------------------------------------
+    # URGENT queue worker — for high-priority jobs like notifications
+    # NotifyProjectCreatedJob uses queue_as :urgent
+    # Fewer threads but faster polling (50ms) so urgent jobs run almost instantly
+    # -------------------------------------------------------------------------
+    - queues: "urgent"
+      threads: 2
+      processes: 1
+      polling_interval: 0.05   # 50ms — very fast for urgent work
+
+    # -------------------------------------------------------------------------
+    # DEFAULT queue worker — for standard background jobs
+    # ArchiveProjectJob, ProjectStatsJob use queue_as :default
+    # More threads, slightly slower polling is fine for non-urgent work
+    # -------------------------------------------------------------------------
+    - queues: "default"
+      threads: 3
+      processes: <%= ENV.fetch("JOB_CONCURRENCY", 1) %>
+      polling_interval: 0.1    # 100ms
+
+    # -------------------------------------------------------------------------
+    # MAILERS queue worker — Rails automatically uses "mailers" queue for ActionMailer
+    # PasswordsMailer reset emails go here
+    # -------------------------------------------------------------------------
+    - queues: "mailers"
+      threads: 2
+      processes: 1
+      polling_interval: 0.1
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  <<: *default

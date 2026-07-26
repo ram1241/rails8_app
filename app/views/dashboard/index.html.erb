@@ -1,0 +1,706 @@
+<%# ===========================================================================
+    RAILS 8 FEATURES DASHBOARD
+    Shows live status of every Rails 8 built-in feature in one place.
+    =========================================================================== %>
+
+<% content_for :title, "Rails 8 Dashboard" %>
+
+<style>
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; margin-top: 20px; }
+  .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .card h3 { margin: 0 0 4px 0; font-size: 1em; display: flex; align-items: center; gap: 8px; }
+  .card .subtitle { font-size: 0.78em; color: #64748b; margin: 0 0 12px 0; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.78em; font-weight: 600; }
+  .badge-green  { background: #dcfce7; color: #166534; }
+  .badge-blue   { background: #dbeafe; color: #1e40af; }
+  .badge-purple { background: #f3e8ff; color: #6b21a8; }
+  .badge-orange { background: #ffedd5; color: #9a3412; }
+  .badge-gray   { background: #f1f5f9; color: #475569; }
+  .stat-row { display: flex; justify-content: space-between; font-size: 0.85em; padding: 4px 0; border-bottom: 1px solid #f1f5f9; }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { color: #64748b; }
+  .stat-value { font-weight: 600; color: #1e293b; }
+  .code-block { background: #1e293b; color: #e2e8f0; padding: 10px 14px; border-radius: 6px; font-size: 0.78em; font-family: monospace; margin-top: 10px; white-space: pre-wrap; line-height: 1.5; }
+</style>
+
+<h1 style="margin-bottom:4px;">🚀 Rails 8 Features Dashboard</h1>
+<p style="color:#64748b; margin:0 0 8px 0; font-size:0.9em;">
+  Live overview of all Rails 8 built-in features running in this app.
+  &nbsp;|&nbsp;
+  <%= link_to "View Projects →", projects_path %>
+  &nbsp;|&nbsp;
+  <%= link_to "Mission Control Jobs →", "/jobs" %>
+</p>
+
+<div class="feature-grid">
+
+  <%# =========================================================================
+      1. SOLID QUEUE
+      ========================================================================= %>
+  <div class="card">
+    <h3>🗄️ Solid Queue <span class="badge badge-green">✓ Active</span></h3>
+    <p class="subtitle">Database-backed job queue — replaces Redis + Sidekiq</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Pending jobs</span>
+      <span class="stat-value"><%= @queue_stats[:pending] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Finished jobs</span>
+      <span class="stat-value"><%= @queue_stats[:finished] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Failed jobs</span>
+      <span class="stat-value" style="color:<%= @queue_stats[:failed] > 0 ? '#dc2626' : '#166534' %>">
+        <%= @queue_stats[:failed] %>
+      </span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Recurring tasks</span>
+      <span class="stat-value"><%= @queue_stats[:recurring] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Queues configured</span>
+      <span class="stat-value">urgent, default, mailers</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">DB file</span>
+      <span class="stat-value">queue.sqlite3</span>
+    </div>
+
+    <div class="code-block"># Enqueue a job (default queue)
+ArchiveProjectJob.perform_later(id)
+
+# High-priority urgent queue
+NotifyProjectCreatedJob.perform_later(id)
+
+# Delayed job (10 seconds from now)
+ArchiveProjectJob
+  .set(wait: 10.seconds)
+  .perform_later(id)</div>
+
+    <p style="margin-top:10px; font-size:0.8em;">
+      <%= link_to "View in Mission Control →", "/jobs" %>
+    </p>
+  </div>
+
+  <%# =========================================================================
+      2. SOLID CACHE
+      ========================================================================= %>
+  <div class="card">
+    <h3>📦 Solid Cache <span class="badge badge-green">✓ Active</span></h3>
+    <p class="subtitle">Database-backed cache — replaces Redis/Memcached</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Cache store</span>
+      <span class="stat-value"><%= @cache_store.gsub("ActiveSupport::Cache::", "") %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Stats source</span>
+      <span class="stat-value" style="font-size:0.8em;">
+        <%= @cached_stats[:source] || "Solid Cache (project_stats/latest)" %>
+      </span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Total projects</span>
+      <span class="stat-value"><%= @cached_stats[:total] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Active projects</span>
+      <span class="stat-value" style="color:#166534;"><%= @cached_stats[:active] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Archived projects</span>
+      <span class="stat-value" style="color:#dc2626;"><%= @cached_stats[:archived] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Archive ratio</span>
+      <span class="stat-value"><%= @cached_stats[:ratio] %>%</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Stats generated at</span>
+      <span class="stat-value" style="font-size:0.8em;"><%= @cached_stats[:generated_at] %></span>
+    </div>
+
+    <div class="code-block"># Low-level cache (expires in 5min)
+Rails.cache.fetch("projects/count",
+  expires_in: 5.minutes) { Project.count }
+
+# Fragment cache in view
+<% cache project do %>
+  <%= render project %>
+<% end %>
+
+# Expire on write
+Rails.cache.delete("projects/count")</div>
+  </div>
+
+  <%# =========================================================================
+      3. SOLID CABLE
+      ========================================================================= %>
+  <div class="card">
+    <h3>📡 Solid Cable <span class="badge badge-green">✓ Active</span></h3>
+    <p class="subtitle">Database-backed Action Cable — replaces Redis pub/sub</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Adapter (production)</span>
+      <span class="stat-value">solid_cable</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Adapter (development)</span>
+      <span class="stat-value">async</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">DB file</span>
+      <span class="stat-value">cable.sqlite3</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Polling interval</span>
+      <span class="stat-value">100ms</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Message retention</span>
+      <span class="stat-value">1 day (auto-cleanup)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Channel</span>
+      <span class="stat-value">"projects_list"</span>
+    </div>
+
+    <div class="code-block"># Action Cable connection authenticated by
+# session cookie (app/channels/application_cable/)
+
+# Subscribe in view (Turbo Streams)
+turbo_stream_from "projects_list"
+
+# Broadcast from model
+after_update_commit ->
+  { broadcast_remove_to "projects_list" }
+
+after_create_commit ->
+  { broadcast_append_to "projects_list",
+    target: "projects" }</div>
+  </div>
+
+  <%# =========================================================================
+      4. RECURRING JOBS
+      ========================================================================= %>
+  <div class="card">
+    <h3>⏰ Recurring Jobs <span class="badge badge-green">✓ Active</span></h3>
+    <p class="subtitle">Built-in cron scheduling — replaces whenever gem</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Recurring tasks in DB</span>
+      <span class="stat-value"><%= @queue_stats[:recurring] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Config file</span>
+      <span class="stat-value">config/recurring.yml</span>
+    </div>
+
+    <div class="code-block"># config/recurring.yml
+production:
+  project_stats_report:
+    class: ProjectStatsJob
+    queue: default
+    schedule: every 5 minutes
+
+  clear_solid_queue_finished_jobs:
+    command: >
+      SolidQueue::Job
+        .clear_finished_in_batches
+    schedule: every hour at minute 12
+
+  expire_project_caches_daily:
+    command: >
+      Rails.cache.delete_matched("project*")
+    schedule: at midnight every day</div>
+  </div>
+
+  <%# =========================================================================
+      5. MISSION CONTROL JOBS
+      ========================================================================= %>
+  <div class="card">
+    <h3>📊 Mission Control Jobs <span class="badge badge-blue">✓ Mounted</span></h3>
+    <p class="subtitle">Web UI for Solid Queue — no Sidekiq Web needed</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Mounted at</span>
+      <span class="stat-value">/jobs</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Auth protection</span>
+      <span class="stat-value">Session cookie constraint</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Features</span>
+      <span class="stat-value">Monitor, retry, discard jobs</span>
+    </div>
+
+    <div class="code-block"># config/routes.rb
+constraints ->(req) {
+  sid = req.cookie_jar.signed[:session_id]
+  sid.present? && Session.exists?(id: sid)
+} do
+  mount MissionControl::Jobs::Engine => "/jobs"
+end</div>
+
+    <p style="margin-top:12px;">
+      <%= link_to "Open Mission Control →", "/jobs",
+            style: "background:#1e40af; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+    </p>
+  </div>
+
+  <%# =========================================================================
+      6. AUTHENTICATION (Rails 8 Generator)
+      ========================================================================= %>
+  <div class="card">
+    <h3>🔐 Authentication <span class="badge badge-purple">✓ Active</span></h3>
+    <p class="subtitle">Built-in auth generator — replaces Devise for basic auth</p>
+
+    <% if @current_session_info[:user] %>
+      <div class="stat-row">
+        <span class="stat-label">Logged in as</span>
+        <span class="stat-value"><%= @current_session_info[:user] %></span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">IP address</span>
+        <span class="stat-value"><%= @current_session_info[:ip] %></span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Session started</span>
+        <span class="stat-value"><%= @current_session_info[:created_at]&.strftime("%d %b %Y %H:%M") %></span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Total sessions</span>
+        <span class="stat-value"><%= @current_session_info[:all_sessions]&.count %></span>
+      </div>
+
+      <% if @current_session_info[:all_sessions]&.any? %>
+        <p style="font-size:0.8em; margin:10px 0 4px 0; font-weight:600; color:#475569;">Active Sessions:</p>
+        <% @current_session_info[:all_sessions].each do |sess| %>
+          <div style="font-size:0.78em; background:#f8fafc; padding:6px 8px; border-radius:4px; margin-bottom:4px;">
+            <%= sess.ip_address %> &mdash; <%= sess.created_at.strftime("%d %b %Y %H:%M") %>
+            <% if sess.id == Current.session&.id %>
+              <span class="badge badge-green" style="margin-left:6px;">current</span>
+            <% end %>
+          </div>
+        <% end %>
+      <% end %>
+    <% else %>
+      <p style="color:#dc2626; font-size:0.85em;">Not logged in</p>
+    <% end %>
+
+    <div class="code-block"># Generated by: rails generate authentication
+# Creates: User, Session, Current models
+#          SessionsController, PasswordsController
+#          Authentication concern
+
+# Usage in controllers:
+before_action :require_authentication
+allow_unauthenticated_access only: %i[new create]
+
+# Thread-local current user
+Current.user       # => User record
+Current.session    # => Session record</div>
+  </div>
+
+  <%# =========================================================================
+      7. PWA SUPPORT
+      ========================================================================= %>
+  <div class="card">
+    <h3>📱 PWA Support <span class="badge badge-green">✓ Enabled</span></h3>
+    <p class="subtitle">Progressive Web App — installable on mobile & desktop</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Manifest route</span>
+      <span class="stat-value"><%= link_to "/manifest", pwa_manifest_path(format: :json) %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Service worker route</span>
+      <span class="stat-value"><%= link_to "/service-worker", pwa_service_worker_path %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Caching strategy</span>
+      <span class="stat-value">Cache-first + background revalidate</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Offline support</span>
+      <span class="stat-value">✅ Yes (falls back to cached /)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Display mode</span>
+      <span class="stat-value">standalone</span>
+    </div>
+
+    <div class="code-block"># Routes enabled in config/routes.rb:
+get "manifest" =>
+  "rails/pwa#manifest"
+get "service-worker" =>
+  "rails/pwa#service_worker"
+
+# Linked in layout:
+tag.link rel: "manifest",
+  href: pwa_manifest_path(format: :json)</div>
+  </div>
+
+  <%# =========================================================================
+      8. HOTWIRE (Turbo + Stimulus)
+      ========================================================================= %>
+  <div class="card">
+    <h3>⚡ Hotwire <span class="badge badge-green">✓ Active</span></h3>
+    <p class="subtitle">Turbo Drive + Turbo Streams + Stimulus — replaces React/Vue</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Turbo Drive</span>
+      <span class="stat-value">✅ SPA-like navigation (no full reload)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Turbo Streams</span>
+      <span class="stat-value">✅ Live project list via Solid Cable</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Broadcast channel</span>
+      <span class="stat-value">"projects_list"</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Stimulus controllers</span>
+      <span class="stat-value">app/javascript/controllers/</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">JS bundler</span>
+      <span class="stat-value">None (Importmap — no Node.js!)</span>
+    </div>
+
+    <div class="code-block"># Projects page subscribes to live updates:
+turbo_stream_from "projects_list"
+
+# Model broadcasts automatically:
+after_create_commit ->
+  { broadcast_append_to "projects_list",
+    target: "projects" }
+
+after_update_commit ->
+  { broadcast_remove_to "projects_list" }
+
+# Demo: Create a project — watch it
+# appear instantly, then disappear
+# 10 seconds later when SolidQueue
+# runs ArchiveProjectJob!</div>
+
+    <p style="margin-top:10px;">
+      <%= link_to "Try it → Create a Project", new_project_path,
+            style: "background:#059669; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+    </p>
+  </div>
+
+  <%# =========================================================================
+      9. PROPSHAFT + IMPORTMAP
+      ========================================================================= %>
+  <div class="card">
+    <h3>🌊 Propshaft + Importmap <span class="badge badge-blue">✓ Active</span></h3>
+    <p class="subtitle">Modern asset pipeline — replaces Sprockets + Webpack</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Asset pipeline</span>
+      <span class="stat-value">Propshaft (fingerprint only)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">JS delivery</span>
+      <span class="stat-value">Importmap (ESM, no bundler)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Node.js required?</span>
+      <span class="stat-value">❌ No</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Build step required?</span>
+      <span class="stat-value">❌ No</span>
+    </div>
+
+    <div class="code-block"># config/importmap.rb
+pin "application"
+pin "@hotwired/turbo-rails"
+pin "@hotwired/stimulus"
+
+# Propshaft: assets → fingerprint → serve
+# No compilation, concatenation, or
+# transpilation step needed.</div>
+  </div>
+
+  <%# =========================================================================
+      10. KAMAL 2 + THRUSTER
+      ========================================================================= %>
+  <div class="card">
+    <h3>🚢 Kamal 2 + Thruster <span class="badge badge-orange">⚙️ Deployment</span></h3>
+    <p class="subtitle">Zero-downtime Docker deploys + HTTP proxy — replaces Capistrano + Nginx</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Deploy config</span>
+      <span class="stat-value">config/deploy.yml</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Docker image</span>
+      <span class="stat-value">rails8_app</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Thruster</span>
+      <span class="stat-value">HTTP/2, gzip, X-Sendfile, buffering</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">CMD in Dockerfile</span>
+      <span class="stat-value">bin/thrust ./bin/rails server</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Kamal hooks</span>
+      <span class="stat-value">.kamal/hooks/ (pre/post deploy)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Health check</span>
+      <span class="stat-value"><%= link_to "/up", rails_health_check_path %></span>
+    </div>
+
+    <div class="code-block"># Deploy commands:
+bin/kamal setup      # first-time setup
+bin/kamal deploy     # build + deploy
+bin/kamal rollback   # roll back
+
+# Aliases (from config/deploy.yml):
+bin/kamal console    # rails console on server
+bin/kamal logs       # tail -f server logs
+bin/kamal shell      # bash on server</div>
+  </div>
+
+  <%# =========================================================================
+      11. RAILS 8.1 — ACTIVE JOB CONTINUATIONS
+      ========================================================================= %>
+  <div class="card">
+    <h3>🔄 Active Job Continuations <span class="badge badge-purple">✨ Rails 8.1</span></h3>
+    <p class="subtitle">Resumable multi-step jobs — survive deploys & restarts without losing progress</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Total imports</span>
+      <span class="stat-value"><%= @import_stats[:total] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Pending</span>
+      <span class="stat-value"><%= @import_stats[:pending] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Processing</span>
+      <span class="stat-value" style="color:#1e40af;"><%= @import_stats[:processing] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Completed</span>
+      <span class="stat-value" style="color:#166534;"><%= @import_stats[:completed] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Failed</span>
+      <span class="stat-value" style="color:<%= @import_stats[:failed] > 0 ? '#dc2626' : '#166534' %>;"><%= @import_stats[:failed] %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Job class</span>
+      <span class="stat-value">ProcessImportJob</span>
+    </div>
+
+    <div class="code-block">class ProcessImportJob < ApplicationJob
+  include ActiveJob::Continuable  # ✨ Rails 8.1
+
+  def perform(import_id)
+    @import = Import.find(import_id)
+
+    step :validate do          # Step 1 (block format)
+      @import.update!(status: "processing")
+    end
+
+    step :process_records do |step|  # Step 2 + cursor
+      @import.records.find_each(start: step.cursor) do |r|
+        r.process
+        step.advance!(from: r.id)   # saves cursor
+      end
+    end
+
+    step :finalize             # Step 3 (method ref)
+  end
+end</div>
+
+    <p style="margin-top:10px;">
+      <%= link_to "Try it → Start an Import", new_import_path,
+            style: "background:#7c3aed; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+      &nbsp;
+      <%= link_to "View All Imports →", imports_path,
+            style: "color:#7c3aed; font-size:0.85em; text-decoration:none;" %>
+    </p>
+  </div>
+
+  <%# =========================================================================
+      12. RAILS 8.1 — STRUCTURED EVENT REPORTING
+      ========================================================================= %>
+  <div class="card">
+    <h3>📡 Structured Event Reporting <span class="badge badge-purple">✨ Rails 8.1</span></h3>
+    <p class="subtitle">Unified event bus — machine-readable structured events with Rails.event.notify()</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Events in cache</span>
+      <span class="stat-value"><%= @structured_events.size %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Subscriber</span>
+      <span class="stat-value">LogEventSubscriber</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Storage</span>
+      <span class="stat-value">Solid Cache (24h TTL)</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Event sources</span>
+      <span class="stat-value" style="font-size:0.8em;">project.*, import.*, stats.*</span>
+    </div>
+    <% if @structured_events.first %>
+      <div class="stat-row">
+        <span class="stat-label">Latest event</span>
+        <span class="stat-value" style="font-size:0.8em;"><%= @structured_events.first[:name] %></span>
+      </div>
+    <% end %>
+
+    <div class="code-block"># Emit from anywhere in Rails 8.1:
+Rails.event.notify(
+  "project.created",
+  project_id: 42, title: "My Project"
+)
+
+# Subscriber receives it:
+class LogEventSubscriber
+  def emit(event)
+    event[:name]            # "project.created"
+    event[:payload]         # { project_id: 42, ... }
+    event[:source_location] # { filepath:, lineno: }
+    event[:occurred_at]     # Time
+  end
+end
+
+# Register in initializer:
+Rails.event.subscribe(LogEventSubscriber.new)</div>
+
+    <p style="margin-top:10px;">
+      <%= link_to "View Events Log →", events_path,
+            style: "background:#7c3aed; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+    </p>
+  </div>
+
+  <%# =========================================================================
+      13. RAILS 8.1 — MARKDOWN RENDERING
+      ========================================================================= %>
+  <div class="card">
+    <h3>📄 Markdown Rendering <span class="badge badge-purple">✨ Rails 8.1</span></h3>
+    <p class="subtitle">respond_to format.md — serve Markdown as a first-class response format</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Projects with notes</span>
+      <span class="stat-value"><%= Project.where.not(notes: [nil, ""]).count %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Access pattern</span>
+      <span class="stat-value">GET /projects/:id.md</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Required method</span>
+      <span class="stat-value">#to_markdown on model</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Use case</span>
+      <span class="stat-value">AI APIs, docs, exports</span>
+    </div>
+
+    <div class="code-block"># Controller (Rails 8.1):
+def show
+  @project = Project.find(params[:id])
+  respond_to do |format|
+    format.html
+    format.md { render markdown: @project }
+  end
+end
+
+# Model must implement #to_markdown:
+def to_markdown
+  "# #{title}\n\n#{notes}"
+end
+
+# Access at: GET /projects/1.md</div>
+
+    <% if Project.first %>
+      <p style="margin-top:10px;">
+        <%= link_to "Try it → View project as .md", project_path(Project.first, format: :md),
+              style: "background:#7c3aed; color:white; padding:6px 14px; border-radius:6px; text-decoration:none; font-size:0.85em;" %>
+      </p>
+    <% else %>
+      <p style="margin-top:10px; font-size:0.85em; color:#64748b;">
+        Create a project first, then visit <code>/projects/:id.md</code>
+      </p>
+    <% end %>
+  </div>
+
+  <%# =========================================================================
+      14. RAILS 8.1 — DEPRECATED ASSOCIATIONS
+      ========================================================================= %>
+  <div class="card">
+    <h3>⚠️ Deprecated Associations <span class="badge badge-purple">✨ Rails 8.1</span></h3>
+    <p class="subtitle">Mark associations as deprecated — get warnings, raise errors, or emit events</p>
+
+    <div class="stat-row">
+      <span class="stat-label">Tasks in DB</span>
+      <span class="stat-value"><%= @tasks_count %></span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Association</span>
+      <span class="stat-value">User has_many :tasks</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Mode</span>
+      <span class="stat-value">deprecated: :notify</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Available modes</span>
+      <span class="stat-value">:warn, :raise, :notify</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Triggers on</span>
+      <span class="stat-value" style="font-size:0.8em;">user.tasks, preload(:tasks), includes...</span>
+    </div>
+
+    <div class="code-block"># Rails 8.1: mark association as deprecated
+class User < ApplicationRecord
+  has_many :tasks, deprecated: :notify
+  # modes: true/:warn → logs warning
+  #        :raise     → raises error
+  #        :notify    → emits Rails.event
+end
+
+# Any access triggers the deprecation:
+user.tasks          # → emits event
+user.tasks = [...]  # → emits event
+User.includes(:tasks) # → emits event
+
+# See /events for the emitted notifications</div>
+
+    <p style="margin-top:10px; font-size:0.82em; color:#475569;">
+      Models where tasks are being migrated to a separate service
+      can be phased out gradually using this feature.
+      <%= link_to "View Events →", events_path, style: "color:#7c3aed;" %>
+    </p>
+  </div>
+
+</div>
+
+<div style="margin-top:30px; padding:16px; background:#f8fafc; border-radius:8px; font-size:0.85em; color:#475569;">
+  <strong>📋 Rails 8 + Rails 8.1 "SQLite for Everything" Philosophy:</strong>
+  No Redis, no Memcached, no separate queue server needed.
+  Solid Queue (queue.sqlite3) + Solid Cache (cache.sqlite3) + Solid Cable (cable.sqlite3)
+  give you a full production stack with zero external services.
+  <br><br>
+  <strong>✨ New in Rails 8.1:</strong>
+  Active Job Continuations (resumable jobs) ·
+  Structured Event Reporting (Rails.event.notify) ·
+  Markdown Rendering (format.md) ·
+  Deprecated Associations (has_many deprecated: :notify)
+</div>

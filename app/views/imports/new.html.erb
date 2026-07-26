@@ -1,0 +1,87 @@
+<%# ===========================================================================
+    RAILS 8.1 — ACTIVE JOB CONTINUATIONS: New Import Form
+    =========================================================================== %>
+
+<% content_for :title, "New Import" %>
+
+<div style="max-width:600px;">
+  <h1>📥 New Import</h1>
+  <p style="color:#64748b; margin-bottom:20px;">
+    Creates an import job using <strong>ActiveJob::Continuable</strong> — Rails 8.1's
+    built-in resumable job feature. The job can be interrupted mid-flight (during a
+    deploy or memory restart) and will resume exactly where it left off.
+  </p>
+
+  <div style="background:#dbeafe; border:1px solid #93c5fd; border-radius:8px; padding:14px; margin-bottom:20px; font-size:0.85em;">
+    <strong>💡 How it works:</strong>
+    <ol style="margin:8px 0 0 16px; padding:0;">
+      <li>You submit this form → an <code>Import</code> record is created</li>
+      <li><code>ProcessImportJob</code> is enqueued on Solid Queue</li>
+      <li>The job runs in 3 steps: <strong>validate → process_records → finalize</strong></li>
+      <li>Each record advances a cursor → if interrupted, it resumes from that cursor</li>
+      <li>Progress is visible live on the next page</li>
+    </ol>
+  </div>
+
+  <%= form_with model: @import, url: imports_path do |f| %>
+    <% if @import.errors.any? %>
+      <div style="background:#fee2e2; border:1px solid #f87171; border-radius:6px; padding:12px; margin-bottom:16px;">
+        <strong>Please fix the following errors:</strong>
+        <ul style="margin:6px 0 0 16px;">
+          <% @import.errors.full_messages.each do |msg| %>
+            <li style="font-size:0.9em;"><%= msg %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div style="margin-bottom:16px;">
+      <%= f.label :name, "Import Name", style: "display:block; font-weight:600; margin-bottom:4px;" %>
+      <%= f.text_field :name, placeholder: "e.g. Q4 Product Catalog Import",
+            style: "width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95em;" %>
+      <p style="font-size:0.78em; color:#64748b; margin:4px 0 0 0;">A descriptive name for this import batch</p>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <%= f.label :total_count, "Number of Records to Import", style: "display:block; font-weight:600; margin-bottom:4px;" %>
+      <%= f.number_field :total_count, min: 1, max: 1000, value: 50,
+            style: "width:100%; padding:8px 12px; border:1px solid #cbd5e1; border-radius:6px; font-size:0.95em;" %>
+      <p style="font-size:0.78em; color:#64748b; margin:4px 0 0 0;">
+        Simulates a CSV with this many rows. Keep ≤ 100 for quick demos; larger values show cursor resumption better.
+      </p>
+    </div>
+
+    <div style="display:flex; gap:10px; align-items:center; margin-top:20px;">
+      <%= f.submit "🚀 Start Import",
+            style: "background:#1e40af; color:white; padding:10px 22px; border:none; border-radius:6px; font-size:0.95em; cursor:pointer;" %>
+      <%= link_to "Cancel", imports_path,
+            style: "color:#64748b; font-size:0.9em; text-decoration:none;" %>
+    </div>
+  <% end %>
+
+  <hr style="margin:30px 0; border:none; border-top:1px solid #e2e8f0;">
+
+  <div style="font-size:0.82em; color:#475569;">
+    <strong>Code highlight:</strong>
+    <pre style="background:#1e293b; color:#e2e8f0; padding:14px; border-radius:6px; overflow:auto; margin-top:8px; line-height:1.6;">class ProcessImportJob < ApplicationJob
+  include ActiveJob::Continuable  # Rails 8.1 ✨
+
+  def perform(import_id)
+    @import = Import.find(import_id)   # runs on EVERY resume
+
+    step :validate do                  # Step 1: all-or-nothing
+      @import.update!(status: "processing")
+    end
+
+    step :process_records do |step|    # Step 2: cursor-based
+      @import.records.find_each(start: step.cursor) do |r|
+        r.process
+        step.advance!(from: r.id)      # saves cursor, checks stopping?
+      end
+    end
+
+    step :finalize                     # Step 3: method reference
+  end
+end</pre>
+  </div>
+</div>

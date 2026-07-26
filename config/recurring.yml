@@ -1,0 +1,60 @@
+# ===========================================================================
+# SOLID QUEUE — RECURRING JOBS CONFIGURATION
+# ===========================================================================
+# This file defines cron-like scheduled jobs powered by Solid Queue.
+# No external cron daemon or 'whenever' gem needed.
+#
+# How it works:
+#   1. SolidQueue::Dispatcher reads this file on boot
+#   2. Creates SolidQueue::RecurringTask records in queue.sqlite3
+#   3. Enqueues the corresponding job class at the defined schedule
+#   4. Workers pick up and execute the job
+#
+# Schedule DSL examples:
+#   every minute
+#   every 5 minutes
+#   every hour
+#   every hour at :30   (at 30 minutes past the hour)
+#   at 5am every day
+#   every Monday at 9am
+#   every day at 11:30pm
+#
+# Two forms of task definition:
+#   class:   → enqueues an ActiveJob class via perform_later
+#   command: → evaluates a Ruby expression directly (no job class needed)
+# ===========================================================================
+
+production:
+  # ---------------------------------------------------------------------------
+  # Every 5 minutes: compute project stats and store in Solid Cache
+  # Uses the ProjectStatsJob class
+  # ---------------------------------------------------------------------------
+  project_stats_report:
+    class: ProjectStatsJob
+    queue: default
+    schedule: every 5 minutes
+
+  # ---------------------------------------------------------------------------
+  # Every hour at minute 12: clear finished Solid Queue jobs from the DB
+  # Uses command: form — runs Ruby inline, no job class needed
+  # This keeps queue.sqlite3 lean by removing completed job records
+  # ---------------------------------------------------------------------------
+  clear_solid_queue_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    schedule: every hour at minute 12
+
+  # ---------------------------------------------------------------------------
+  # Every day at midnight: expire stale project cache entries
+  # Demonstrates: scheduled cache invalidation via recurring job
+  # ---------------------------------------------------------------------------
+  expire_project_caches_daily:
+    command: >
+      Rails.cache.delete_matched("project*")
+    schedule: at midnight every day
+
+development:
+  # In development, run stats job every minute so you can see it working
+  project_stats_report:
+    class: ProjectStatsJob
+    queue: default
+    schedule: every minute

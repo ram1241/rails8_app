@@ -1,0 +1,89 @@
+# Name of your application. Used to uniquely configure containers.
+service: rails8_app
+
+# Name of the container image.
+# Using GitHub Container Registry (ghcr.io) — free for public repos, free private with GitHub Free plan.
+# Replace YOUR_GITHUB_USERNAME with your actual GitHub username.
+image: ram1241/rails8_app
+
+# Deploy to these servers.
+# Replace YOUR_SERVER_IP with your Oracle Cloud Always Free instance public IP.
+servers:
+  web:
+    - YOUR_SERVER_IP
+  # Uncomment to run Solid Queue as a dedicated job process on the same server:
+  # job:
+  #   hosts:
+  #     - YOUR_SERVER_IP
+  #   cmd: bin/jobs
+
+# Enable SSL auto-certification via Let's Encrypt.
+# kamal-proxy handles HTTPS termination automatically — no nginx/certbot setup needed.
+# Replace YOUR_DOMAIN with your actual domain (e.g. myapp.example.com).
+# If you don't have a domain, comment out this proxy block and access via IP on port 80.
+proxy:
+  ssl: true
+  host: YOUR_DOMAIN
+  # Forward the /up health check without auth
+  healthcheck:
+    path: /up
+    interval: 10
+    timeout: 30
+
+# GitHub Container Registry — free for public repos; free private repos with GitHub Free plan.
+# No credit card required.
+registry:
+  server: ghcr.io
+  username:
+    - KAMAL_REGISTRY_USERNAME
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+# Inject ENV variables into containers (secrets come from .kamal/secrets).
+env:
+  secret:
+    - RAILS_MASTER_KEY
+  clear:
+    # Run Solid Queue Supervisor inside Puma — no extra process needed on a single free server.
+    SOLID_QUEUE_IN_PUMA: true
+
+    # Set to match your domain for Action Cable WebSocket origin checks.
+    # RAILS_ALLOWED_REQUEST_ORIGINS: "https://YOUR_DOMAIN"
+
+    # Log level (use "info" in production; "debug" for troubleshooting)
+    # RAILS_LOG_LEVEL: info
+
+# Aliases are triggered with "bin/kamal <alias>".
+aliases:
+  console: app exec --interactive --reuse "bin/rails console"
+  shell: app exec --interactive --reuse "bash"
+  logs: app logs -f
+  dbc: app exec --interactive --reuse "bin/rails dbconsole --include-password"
+
+# Persistent storage volume for SQLite databases and Active Storage files.
+# Oracle Cloud Always Free includes 200 GB of block storage — this persists across deploys.
+volumes:
+  - "rails8_app_storage:/rails/storage"
+
+# Bridge fingerprinted assets between versions to avoid 404s during deploys.
+asset_path: /rails/public/assets
+
+# Build configuration.
+# Oracle Ampere A1 (free tier) is ARM64. Build locally for arm64 or use remote build.
+builder:
+  # Build for ARM64 to match Oracle Ampere A1 free instances.
+  arch: arm64
+
+  # If you are on an Apple Silicon Mac (M1/M2/M3/M4), arm64 builds natively — fast!
+  # If you are on an Intel/AMD machine, use multiarch or a remote ARM builder:
+  #
+  # Option A: Multiarch (builds both, works everywhere, slower):
+  # arch: amd64
+  # Then set Oracle instance to use AMD VM.Standard.E2.1.Micro instead of A1.
+  #
+  # Option B: Remote build on your Oracle server itself (arm64, free):
+  # remote: ssh://ubuntu@YOUR_SERVER_IP
+
+# SSH user — Oracle Cloud Ubuntu instances use "ubuntu" as the default user, not root.
+ssh:
+  user: ubuntu

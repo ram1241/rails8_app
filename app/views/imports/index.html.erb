@@ -1,0 +1,83 @@
+<%# ===========================================================================
+    RAILS 8.1 — ACTIVE JOB CONTINUATIONS: Imports List
+    =========================================================================== %>
+
+<% content_for :title, "Imports" %>
+
+<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+  <div>
+    <h1 style="margin:0;">📥 Imports</h1>
+    <p style="color:#64748b; margin:4px 0 0 0; font-size:0.9em;">
+      Each import runs via <strong>ProcessImportJob</strong> using <code>ActiveJob::Continuable</code>
+    </p>
+  </div>
+  <%= link_to "New Import", new_import_path,
+        style: "background:#1e40af; color:white; padding:8px 18px; border-radius:6px; text-decoration:none; font-size:0.9em;" %>
+</div>
+
+<% if @imports.empty? %>
+  <div style="background:#f8fafc; border:2px dashed #e2e8f0; border-radius:10px; padding:40px; text-align:center; color:#64748b;">
+    <p style="font-size:1.1em; margin:0 0 12px 0;">No imports yet.</p>
+    <%= link_to "Start your first import →", new_import_path,
+          style: "background:#1e40af; color:white; padding:8px 18px; border-radius:6px; text-decoration:none;" %>
+  </div>
+<% else %>
+  <table style="width:100%; border-collapse:collapse; font-size:0.9em;">
+    <thead>
+      <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+        <th style="padding:10px 14px; text-align:left; color:#475569;">ID</th>
+        <th style="padding:10px 14px; text-align:left; color:#475569;">Name</th>
+        <th style="padding:10px 14px; text-align:left; color:#475569;">Status</th>
+        <th style="padding:10px 14px; text-align:left; color:#475569;">Progress</th>
+        <th style="padding:10px 14px; text-align:left; color:#475569;">Records</th>
+        <th style="padding:10px 14px; text-align:left; color:#475569;">Started</th>
+        <th style="padding:10px 14px; text-align:left; color:#475569;"></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @imports.each do |import| %>
+        <tr style="border-bottom:1px solid #f1f5f9;">
+          <td style="padding:10px 14px; color:#64748b;">#<%= import.id %></td>
+          <td style="padding:10px 14px; font-weight:600;"><%= import.name %></td>
+          <td style="padding:10px 14px;">
+            <span style="
+              padding:2px 10px;
+              border-radius:999px;
+              font-size:0.8em;
+              font-weight:600;
+              <%= case import.status
+                  when 'pending'    then 'background:#f1f5f9; color:#475569;'
+                  when 'processing' then 'background:#dbeafe; color:#1e40af;'
+                  when 'completed'  then 'background:#dcfce7; color:#166534;'
+                  when 'failed'     then 'background:#fee2e2; color:#dc2626;'
+                  end %>
+            ">
+              <%= import.status.capitalize %>
+            </span>
+          </td>
+          <td style="padding:10px 14px; min-width:120px;">
+            <div style="background:#e2e8f0; border-radius:999px; height:8px; overflow:hidden;">
+              <div style="
+                height:100%;
+                border-radius:999px;
+                width:<%= [import.progress_percentage, 100].min %>%;
+                background:<%= import.completed? ? '#22c55e' : import.failed? ? '#ef4444' : '#3b82f6' %>;
+              "></div>
+            </div>
+            <span style="font-size:0.75em; color:#64748b;"><%= import.progress_percentage %>%</span>
+          </td>
+          <td style="padding:10px 14px; color:#475569;">
+            <%= import.processed_count %> / <%= import.total_count %>
+          </td>
+          <td style="padding:10px 14px; color:#64748b; font-size:0.8em;">
+            <%= import.created_at.strftime("%d %b %H:%M") %>
+          </td>
+          <td style="padding:10px 14px;">
+            <%= link_to "View →", import_path(import),
+                  style: "color:#1e40af; text-decoration:none; font-size:0.85em;" %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

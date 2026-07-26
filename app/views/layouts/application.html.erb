@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title><%= content_for(:title) || "Rails8 App" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Rails8 App">
+    <meta name="mobile-web-app-capable" content="yes">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+
+    <%= yield :head %>
+
+    <%# ========================================================================= %>
+    <%# PWA — Link the Web App Manifest                                           %>
+    <%# This tells browsers this app is installable as a PWA.                     %>
+    <%# Route: get "manifest" => "rails/pwa#manifest" (config/routes.rb)          %>
+    <%# ========================================================================= %>
+    <%= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
+
+    <link rel="icon" href="/icon.png" type="image/png">
+    <link rel="icon" href="/icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon.png">
+
+    <%# Includes all stylesheet files in app/assets/stylesheets %>
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body>
+    <%# ========================================================================= %>
+    <%# AUTHENTICATION — Navigation bar showing current user + session controls   %>
+    <%# Current.user is set by the Authentication concern via cookie-backed        %>
+    <%# session lookup (app/controllers/concerns/authentication.rb)               %>
+    <%# ========================================================================= %>
+    <nav style="background:#1a1a2e; color:white; padding:10px 20px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+      <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        <strong><%= link_to "🚀 Rails8 App", root_path, style: "color:white; text-decoration:none;" %></strong>
+        <span style="color:#4a5568;">|</span>
+        <%= link_to "Projects", projects_path, style: "color:#aef;" %>
+        <span style="color:#4a5568;">|</span>
+        <%= link_to "Dashboard", dashboard_path, style: "color:#aef;" %>
+        <span style="color:#4a5568;">|</span>
+        <%# ===================================================================== %>
+        <%# RAILS 8.1 — ACTIVE JOB CONTINUATIONS: Imports link                  %>
+        <%# ===================================================================== %>
+        <%= link_to "📥 Imports", imports_path, style: "color:#86efac;",
+              title: "Rails 8.1: ActiveJob::Continuable — resumable multi-step jobs" %>
+        <span style="color:#4a5568;">|</span>
+        <%# ===================================================================== %>
+        <%# RAILS 8.1 — STRUCTURED EVENTS: Events link                          %>
+        <%# ===================================================================== %>
+        <%= link_to "📡 Events", events_path, style: "color:#c4b5fd;",
+              title: "Rails 8.1: Structured Event Reporting via Rails.event.notify()" %>
+        <span style="color:#4a5568;">|</span>
+        <%= link_to "Jobs UI", "/jobs", style: "color:#aef;" %>
+      </div>
+      <div>
+        <% if authenticated? %>
+          <span style="color:#cfc;">👤 <%= Current.user.email_address %></span>
+          &nbsp;
+          <%= button_to "Sign out", session_path, method: :delete,
+                style: "background:#c0392b; color:white; border:none; padding:4px 10px; cursor:pointer; border-radius:4px;" %>
+        <% else %>
+          <%= link_to "Sign in", new_session_path, style: "color:#aef;" %>
+        <% end %>
+      </div>
+    </nav>
+
+    <div style="padding: 20px;">
+      <%= yield %>
+    </div>
+
+    <%# ========================================================================= %>
+    <%# PWA — Register the Service Worker                                          %>
+    <%# The service worker enables offline caching & background sync.             %>
+    <%# Route: get "service-worker" => "rails/pwa#service_worker"                 %>
+    <%# ========================================================================= %>
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('<%= pwa_service_worker_path %>')
+          .then(reg => console.log('[PWA] Service Worker registered:', reg.scope))
+          .catch(err => console.warn('[PWA] Service Worker registration failed:', err));
+      }
+    </script>
+  </body>
+</html>

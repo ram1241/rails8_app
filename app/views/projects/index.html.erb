@@ -1,0 +1,49 @@
+<%# =========================================================================== %>
+<%# SOLID CABLE — turbo_stream_from subscribes this page to the "projects_list" %>
+<%# channel. When the server broadcasts, this page updates without a reload.    %>
+<%# =========================================================================== %>
+<%= turbo_stream_from "projects_list" %>
+
+<p style="color: green"><%= notice %></p>
+
+<h1>Projects</h1>
+
+<%# =========================================================================== %>
+<%# SOLID CACHE — Low-level cache stats panel                                   %>
+<%# @projects_count, @active_count, @archived_count are fetched via             %>
+<%# Rails.cache.fetch(...) in ProjectsController#index                           %>
+<%# First request: hits DB. Subsequent requests within 5min: served from cache  %>
+<%# =========================================================================== %>
+<div style="background:#f0f7ff; border:1px solid #b3d4fb; padding:12px; margin-bottom:20px; border-radius:6px;">
+  <strong>📦 Solid Cache — Project Stats</strong>
+  <em style="font-size:0.85em; color:#666;">(cached for 5 minutes — expire on write)</em>
+  <ul style="margin:8px 0 0 0; list-style:none; padding:0;">
+    <li>Total Projects : <strong><%= @projects_count %></strong></li>
+    <li>Active         : <strong style="color:green"><%= @active_count %></strong></li>
+    <li>Archived       : <strong style="color:red"><%= @archived_count %></strong></li>
+  </ul>
+</div>
+
+<%# =========================================================================== %>
+<%# HOTWIRE TURBO STREAMS — "projects" div is the broadcast target              %>
+<%# broadcast_append_to "projects_list", target: "projects" in Project model    %>
+<%# appends new project cards here in real-time without a page reload           %>
+<%# =========================================================================== %>
+<div id="projects">
+  <% @projects.each do |project| %>
+    <%# Skip archived projects on first render %>
+    <% #next if project.archived? %>
+
+    <%# ======================================================================= %>
+    <%# SOLID CACHE — Fragment caching per project record                       %>
+    <%# cache key: "views/projects/N-TIMESTAMP" (auto-expires on update)       %>
+    <%# When project.updated_at changes, Rails generates a new cache key        %>
+    <%# and the old fragment is evicted automatically.                           %>
+    <%# ======================================================================= %>
+    <% cache project do %>
+      <%= render project %>
+    <% end %>
+  <% end %>
+</div>
+
+<%= link_to "New project", new_project_path %>
